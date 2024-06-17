@@ -1,0 +1,21 @@
+# Build files
+dist/
+build/
+
+#node modules
+node_modules
+
+#nx cache
+.nx/cache
+
+# System Files
+.DS_Store
+.env
+.env.local
+.env.production
+.nx
+tsconfig.tsbuildinfo
+
+# Log Files
+npm-debug.log
+yarn-error.log

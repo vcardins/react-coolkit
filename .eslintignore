@@ -1,0 +1,6 @@
+.husky
+.github
+.nx
+**/dist/
+**/node_modules/
+

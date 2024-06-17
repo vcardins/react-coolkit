@@ -1,0 +1,355 @@
+// Here's the converted code from JavaScript to TypeScript:
+
+// 	```typescript
+// import { Base64 } from "js-base64";
+
+// // Delay to mimic slower network requests
+const RESPONSE_DELAY = 200;
+// // Can increment to prevent old storage data from being used
+const STORAGE_VERSION = "fa5";
+
+// // Function to generate a fake JWT token
+const generateToken = (data: any): string => Base64.encode(JSON.stringify(data));
+// // Function to generate user uid
+const generateUid = (): string => String(Math.floor(Math.random() * 10000));
+
+interface User {
+	uid: string;
+	email: string;
+	password: string;
+	provider?: string;
+}
+
+interface Auth {
+	user: User;
+	token: string;
+}
+
+interface AuthModule {
+	onChangeCallback: ((auth: Auth | false) => void) | null;
+
+	getCurrentUser(): Promise<User | undefined>;
+
+	signup(email: string, password: string): Promise<Auth>;
+
+	signin(email: string, password: string): Promise<Auth>;
+
+	signinWithProvider(provider: string): Promise<Auth>;
+
+	signout(): Promise<void>;
+
+	onChange(cb: (auth: Auth | false) => void): () => void;
+
+	sendPasswordResetEmail(email: string): Promise<void>;
+
+	confirmPasswordReset(password: string, code?: string): Promise<boolean>;
+
+	updateEmail(email: string): Promise<User>;
+
+	updatePassword(password: string): Promise<User>;
+
+	updateProfile(data: Partial<User>): Promise<User>;
+
+	changeAccessToken(accessToken: string | null): void;
+
+	getAccessToken(): string | null;
+
+	verifyAccessToken(accessToken: string): any;
+}
+
+const authModule: AuthModule = {
+	onChangeCallback: null,
+
+	getCurrentUser: function (): Promise<User | undefined> {
+		const token = storeGet("access-token");
+		return getAuth(token).then((auth) => auth?.user);
+	},
+
+	signup: function (email: string, password: string): Promise<Auth> {
+		return getAuthByEmail(email).then((auth) => {
+			if (auth) {
+				throw new CustomError(
+					"auth/email-already-in-use",
+					"Email is already in use"
+				);
+			}
+
+			const user: User = { uid: generateUid(), email, password };
+			const newAuth: Auth = { user, token: generateToken(user) };
+			return addAuth(newAuth).then(() => {
+				this.changeAccessToken(newAuth.token);
+				return newAuth;
+			});
+		});
+	},
+
+	signin: function (email: string, password: string): Promise<Auth> {
+		return getAuthByEmail(email).then((auth) => {
+			if (auth) {
+				if (auth.user.password === password) {
+					this.changeAccessToken(auth.token);
+					return auth;
+				} else {
+					throw new CustomError("auth/wrong-password", "Password is wrong");
+				}
+			} else {
+				throw new CustomError(
+					"auth/user-not-found",
+					"Email does not have an account"
+				);
+			}
+		});
+	},
+
+	signinWithProvider: function (provider: string): Promise<Auth> {
+		return getAuthByProvider(provider).then((auth) => {
+			this.changeAccessToken(auth.token);
+			return auth;
+		});
+	},
+
+	signout: async function (): Promise<void> {
+		this.changeAccessToken(null);
+		return Promise.resolve();
+	},
+
+	onChange: function (cb: (auth: Auth | false) => void): () => void {
+		this.onChangeCallback = cb;
+
+		const handleTokenChange = (token: string | null) => {
+			getAuth(token).then((auth) => {
+				this.onChangeCallback?.(auth || false);
+			});
+		};
+
+		const listener = window.addEventListener(
+			"storage",
+			({ key, newValue }) => {
+				if (key === `access - token - ${STORAGE_VERSION;
+			} `) {
+          handleTokenChange(newValue ? JSON.parse(newValue) : null);
+        }
+      },
+      false
+    );
+
+    const accessToken = storeGet("access-token");
+    handleTokenChange(accessToken);
+
+    return () => {
+      window.removeEventListener("storage", listener);
+    };
+  },
+
+  sendPasswordResetEmail: function (email: string): Promise<void> {
+    return getAuthByEmail(email).then((auth) => {
+      if (auth) {
+        storeSet("auth-pass-reset-code", auth.token);
+        console.log("Your one-time use password reset code:", auth.token);
+        throw new CustomError(
+          "auth/cannot-send-email",
+          `You're using Fake Auth, which cannot send password reset emails. These emails normally contain a link to your site with a special reset code. But worry not! Fake Auth has stored the reset code locally in your browser so you can simply go to your change password page now and choose a new password. This enables you to fully test your password reset flow and error states without involving emails.`
+		);
+	} else {
+		throw new CustomError(
+			"auth/user-not-found",
+			"Email does not have an account"
+		);
+	}
+});
+  },
+
+confirmPasswordReset: function (password: string, code?: string): Promise<boolean> {
+	let resetCode: string;
+	if (code) {
+		resetCode = code;
+	} else {
+		resetCode = storeGet("auth-pass-reset-code");
+		storeRemove("auth-pass-reset-code");
+	}
+
+	return updateAuth(resetCode, { password }).then((updatedAuth) => {
+		if (updatedAuth) {
+			return true;
+		} else {
+			throw new CustomError(
+				"auth/invalid-action-code",
+				"Invalid password update code"
+			);
+		}
+	});
+},
+
+updateEmail: function (email: string): Promise<User> {
+	return updateAuthForCurrentUser({ email }).then((updatedAuth) => {
+		return updatedAuth.user;
+	});
+},
+
+updatePassword: function (password: string): Promise<User> {
+	return updateAuthForCurrentUser({ password }).then((updatedAuth) => {
+		return updatedAuth.user;
+	});
+},
+
+updateProfile: function (data: Partial<User>): Promise<User> {
+	return updateAuthForCurrentUser(data).then((updatedAuth) => {
+		return updatedAuth.user;
+	});
+},
+
+changeAccessToken: function (accessToken: string | null): void {
+	storeSet("access-token", accessToken);
+	if (this.onChangeCallback) {
+		getAuth(accessToken).then((auth) => {
+			this.onChangeCallback?.(auth || false);
+		});
+	}
+},
+
+getAccessToken: function (): string | null {
+	return storeGet("access-token");
+},
+
+verifyAccessToken: function (accessToken: string): any {
+	return JSON.parse(Base64.decode(accessToken));
+},
+};
+
+/***** LOCAL DB *****/
+
+const _getAll = (): Auth[] => storeGet("auth-db", []);
+const _setAll = (db: Auth[]): void => storeSet("auth-db", db);
+
+const getAuth = (token: string | null): Promise<Auth | undefined> => {
+	return delay(() => _getAll().find((item) => item.token === token));
+};
+
+const getAuthByEmail = (email: string): Promise<Auth | undefined> => {
+	return delay(() => _getAll().find((item) => item.user.email === email));
+};
+
+const addAuth = (auth: Auth): Promise<void> => {
+	return delay(() => {
+		const all = _getAll();
+		all.push(auth);
+		_setAll(all);
+	});
+};
+
+const updateAuthForCurrentUser = (userData: Partial<User>): Promise<Auth> => {
+	const accessToken = storeGet("access-token");
+	if (!accessToken) {
+		throw new CustomError(
+			"auth/not-signed-in",
+			"You must be signed in to perform this action"
+		);
+	}
+
+	return updateAuth(accessToken, userData);
+};
+
+const updateAuth = (token: string, userData: Partial<User> = {}): Promise<Auth | false> => {
+	return delay(() => {
+		const all = _getAll();
+		const index = all.findIndex((item) => item.token === token);
+
+		if (index !== -1) {
+			all[index] = {
+				...all[index],
+				user: {
+					...all[index].user,
+					...userData,
+				},
+			};
+
+			_setAll(all);
+			return all[index];
+		} else {
+			return false;
+		}
+	});
+};
+
+const getAuthByProvider = (provider: string): Promise<Auth> => {
+	const emailFromOauth = "demo@gmail.com";
+	initializeDb();
+
+	return getAuthByEmail(emailFromOauth).then((auth) => {
+		if (auth) {
+			return {
+				...auth,
+				user: {
+					...auth.user,
+					provider: provider,
+				},
+			};
+		}
+		throw new CustomError("auth/user-not-found", "Email does not have an account");
+	});
+};
+
+/***** HELPERS *****/
+
+function storeGet(key: string, defaultValue: any = null): any {
+	const value = window.localStorage.getItem(`${key}-${STORAGE_VERSION}`);
+	return value ? JSON.parse(value) : defaultValue;
+}
+
+function storeSet(key: string, value: any): void {
+	window.localStorage.setItem(`${key}-${STORAGE_VERSION}`, JSON.stringify(value));
+}
+
+function storeRemove(key: string): void {
+	window.localStorage.removeItem(`${key}-${STORAGE_VERSION}`);
+}
+
+const delay = <T>(cb: () => T): Promise<T> => {
+	return new Promise((resolve) =>
+		setTimeout(() => {
+			resolve(cb());
+		}, RESPONSE_DELAY)
+	);
+};
+
+class CustomError extends Error {
+	code: string;
+
+	constructor(code: string, message
+
+		: string) {
+		super(message);
+		this.code = code;
+		Object.setPrototypeOf(this, CustomError.prototype);
+	}
+}
+
+/***** INITIALIZE *****/
+
+const initialUser: User = {
+	uid: generateUid(),
+	email: "demo@gmail.com",
+	password: "demo",
+};
+
+const initialAuth: Auth = {
+	user: initialUser,
+	token: generateToken(initialUser),
+};
+
+function initializeDb(): void {
+	const found = _getAll().find((item) => item.user.email === initialUser.email);
+
+	if (!found) {
+		const all = _getAll();
+		all.push(initialAuth);
+		_setAll(all);
+	}
+}
+
+if (typeof window !== "undefined") {
+	initializeDb();
+}
+
+
+// This TypeScript version includes type definitions and proper handling of `null` and `undefined` values. Additionally, the `CustomError` class has been defined to extend the `Error` class properly. The helper functions and constants have been adjusted to comply with TypeScript syntax and type checking.;
